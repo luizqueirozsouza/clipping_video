@@ -110,7 +110,6 @@ Para uma instalação limpa e sem necessidade de configurar o FFmpeg manualmente
 - `/cuts`: Pasta onde os cortes processados serão salvos.
 - `/subs`: Arquivos temporários de legendagem.
 - `/bkp`: Backup dos vídeos mestre após o processamento.
-- `/tokens`: Arquivos de autenticação para serviços (Google/Drive).
 
 ---
 
