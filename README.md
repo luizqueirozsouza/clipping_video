@@ -40,14 +40,36 @@ OPENROUTER_API_KEY=sua_chave_aqui
 OPENROUTER_MODEL=google/gemini-2.0-flash-001
 
 # Storage (MinIO)
-MINIO_ENDPOINT=localhost:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_SECURE=False
+MINIO_ENDPOINT=dinastia-minio-s3.kb4x5f.easypanel.host
+MINIO_ACCESS_KEY=sua_access_key
+MINIO_SECRET_KEY=sua_secret_key
+MINIO_SECURE=true
 MINIO_BUCKET=youtube
 
-# Outros
-FFMPEG_PATH=ffmpeg
+# Performance & Processamento
+PARALLEL_WORKERS=7        # Número de workers paralelos (ajuste conforme sua CPU)
+PARALLEL_CHUNKS=4         # Chunks paralelos para renderização
+SAMPLE_RATE=15            # Intervalo de frames para análise (10-30)
+SAMPLE_FPS=1              # FPS para detecção de rostos
+DETECTION_SCALE=640       # Escala de redimensionamento para detecção
+USE_GPU=1                 # Usar aceleração por GPU se disponível (0/1)
+
+# Estratégia de Conteúdo
+PLATFORMS=shorts,youtube  # Opções: shorts, tiktok, youtube
+CURRENT_PLATFORM=shorts   # Plataforma ativa para filtros específicos
+AUTO_PREPROCESS=1         # Ativa pré-processamento automático
+
+# Anti-Copyright & Descaracterização (DESCHAR)
+DESCHAR_ENABLED=1         # Ativa filtros de descaracterização
+REMOVE_LOGOS=1            # Aplica zoom para remover logos de borda
+ZOOM_FACTOR=1.2           # Fator de zoom (1.2 = 20%)
+IMAGES_DIR=images         # Pasta para sobreposição de imagens
+IMAGE_FREQUENCY=30        # Frequência de imagens (em segundos)
+IMAGE_DURATION=6          # Duração de cada imagem sobreposta
+
+# Caminhos do Sistema
+FFMPEG_PATH=ffmpeg        # Caminho para o executável do FFmpeg
+VIDEO_LAYOUT=auto_podcast  # single ou auto_podcast
 ```
 
 ## 🏃 Como Executar
