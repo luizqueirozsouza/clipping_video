@@ -93,6 +93,17 @@ VIDEO_LAYOUT=auto_podcast  # single ou auto_podcast
     streamlit run app.py
     ```
 
+### 🐳 Alternativa: Execução via Docker (Recomendado para Produção)
+
+Para uma instalação limpa e sem necessidade de configurar o FFmpeg manualmente no sistema host:
+
+1.  **Certifique-se de ter o Docker e Docker Compose instalados.**
+2.  **Suba o container:**
+    ```bash
+    docker-compose up --build
+    ```
+3.  Acesse a aplicação em: `http://localhost:8501`
+
 ## 📂 Estrutura de Pastas
 
 - `/projeto_atual`: Pasta onde o vídeo mestre deve ser colocado ou enviado.
