@@ -1,0 +1,27 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+.env
+
+# Project specific data and exports
+projeto_atual/
+cuts/
+subs/
+bkp/
+tokens/
+video_metadata.json
+transcript_segments.json
+transcript_words.json
+video_descriptions.json
+outputs/
+*.mp4
+*.m4a
+*.log
+cookies.txt
