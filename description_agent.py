@@ -15,7 +15,7 @@ load_dotenv(override=True)
 # Configurações
 ORIGINAL_URL = os.getenv("ORIGINAL_URL", "[LINK_DO_VÍDEO_AQUI]")
 CHANNEL_TYPE = os.getenv("CHANNEL_TYPE", "christian").lower()
-MAX_DESC_LENGTH = 2200
+MAX_DESC_LENGTH = 2000
 
 # Mapa global de transcrições (carregado via fallback)
 TRANSCRIPTS_MAP = {}
@@ -25,40 +25,51 @@ TRANSCRIPTS_MAP = {}
 # ==============================================================================
 PERSONAS = {
     "christian": """
-    Você é um redator profissional de descrições para YouTube e Instagram, especializado em conteúdo cristão evangelístico no estilo Way of the Master (Ray Comfort).
-
-    TAREFA:
-    A partir da transcrição abaixo, crie uma descrição completa, impactante e profunda para este vídeo.
-
-    REGRAS OBRIGATÓRIAS:
-    1. NÃO copie a transcrição literalmente.
-    2. Descaracterize termos sensíveis para evitar filtros.
-    3. PROFUNDIDADE: Mesmo para vídeos curtos, escreva um texto denso e espiritual.
-    4. Siga a estrutura abaixo rigorosamente.
-    5. LIMITE DE CARACTERES: A descrição total DEVE ter no máximo 2100 caracteres.
-
-    ESTRUTURA:
-    1️⃣ Abertura (Pergunta reflexiva sobre eternidade/pecado).
-    2️⃣ Contexto (O conflito moral ou o tema do vídeo).
-    3️⃣ Ensinamento (A Lei de Deus, 10 Mandamentos, santidade).
-    4️⃣ Evangelho (Jesus Cristo, a cruz, arrependimento e graça).
-    5️⃣ Reflexão Final ("Se você morresse hoje...").
-    6️⃣ CTA (Curta, Comente, Compartilhe).
-
-    DADOS DO VÍDEO:
-    - Título: {title}
-    - Transcrição: "{text}"
+    Você é um redator especializado em apologética e evangelismo bíblico (Estilo Ray Comfort e Todd Friel).
     
-    SAÍDA (JSON):
-    {{
-        "description": "Texto completo aqui (NÃO inclua o link aqui, ele será adicionado automaticamente)...",
-        "hashtags": "#tags"
-    }}
+    SUA MISSÃO: Criar uma descrição ÚNICA para o clipe abaixo, organizada e visualmente atraente.
+    
+    REGRAS DE OURO:
+    1. ORGANIZAÇÃO: Divida o texto em 3 parágrafos claros (Introdução ao assunto, Aplicação da Lei, Mensagem do Evangelho). Use quebras de linha entre eles.
+    2. EMOJIS: Use emojis de forma estratégica para pontuar e dar vida ao texto (ex: ⚖️, 🙏, ✝️, 🏢, 🤔). Não exagere, mantenha a seriedade.
+    3. ABERTURA ESPECÍFICA: Comece citando o assunto EXATO do vídeo (ex: "Neste vídeo sobre {title}...").
+    4. ANALOGIA REAL: Use apenas analogias presentes no texto fornecido.
+    5. FLUXO: Gancho do clipe -> Lei de Deus (Pecado) -> Evangelho (Cristo/Fé/Arrependimento).
+    6. LIMITE: {limit} caracteres.
+    
+    CONTEÚDO PARA TRABALHAR:
+    Título: {title}
+    {text}
+    """,
+    "politics": """
+    Você é um analista político sênior. 
+    TAREFA: Crie uma descrição analítica sobre {title} baseada no conteúdo abaixo.
+    1. Texto Fluido: Sem bullets.
+    2. LIMITE: {limit} caracteres.
+    {text}
+    """,
+    "bitcoin": """
+    Você é um especialista em criptomoedas. 
+    TAREFA: Crie uma descrição sobre {title} baseada no conteúdo abaixo.
+    1. LIMITE: {limit} caracteres.
+    {text}
+    """,
+    "economy": """
+    Você é um economista focado em liberdade. 
+    TAREFA: Crie uma descrição didática sobre {title} baseada no conteúdo abaixo.
+    1. LIMITE: {limit} caracteres.
+    {text}
+    """,
+    "aesthetics": """
+    Você é um redator profissional de estética e beleza.
+    TAREFA: Crie uma descrição informativa sobre {title} baseada no conteúdo abaixo.
+    1. LIMITE: {limit} caracteres.
+    {text}
     """,
     "default": """
-    Crie uma descrição completa para o vídeo.
-    Limite: 2100 caracteres.
-    Transcrição: {text}
+    Crie uma descrição informativa para o vídeo {title} baseada no conteúdo abaixo.
+    1. LIMITE: {limit} caracteres.
+    {text}
     """,
 }
 
@@ -112,9 +123,10 @@ def load_transcripts_map():
                                     if s["end"] > start and s["start"] < end
                                 ]
                             )
-                            if len(text) < 50 and cut.get("summary"):
-                                text = f"{cut.get('summary')} {text}"
-                            TRANSCRIPTS_MAP[slug] = text
+                            # Une o resumo à transcrição para dar contexto rico ao LLM
+                            summary = cut.get("summary", "")
+                            full_context = f"RESUMO DO CONTEÚDO: {summary}\n\nTRANSCRIÇÃO BRUTA: {text}"
+                            TRANSCRIPTS_MAP[slug] = full_context
                             count += 1
         print(f"✅ Mapa carregado com {count} referências.")
     except Exception as e:
@@ -122,10 +134,29 @@ def load_transcripts_map():
 
 
 def generate_description(text, title):
-    persona = PERSONAS.get(CHANNEL_TYPE, PERSONAS.get("christian", PERSONAS["default"]))
+    persona_template = PERSONAS.get(
+        CHANNEL_TYPE, PERSONAS.get("christian", PERSONAS["default"])
+    )
+
+    # Log de depuração para verificar o que está sendo enviado
+    clean_text_log = text[:100].replace("\n", " ")
+    print(f"      📝 Processando: {title[:30]}... | Transcrição: {clean_text_log}...")
+
+    # Calcula overhead (hashtags estimadas + URL + quebras de linha)
+    url_footer = f"\n\n🎥 Vídeo Original: {ORIGINAL_URL}"
+    # Reservamos 300 caracteres para hashtags e margem de segurança
+    reserved = len(url_footer) + 300
+    available_limit = MAX_DESC_LENGTH - reserved
+    if available_limit < 500:
+        available_limit = 500  # Segurança mínima
+
     try:
-        prompt_text = persona.format(title=title, text=text.replace("\n", " ")[:3000])
-    except Exception:
+        # Passa o limite dinâmico para o prompt
+        prompt_text = persona_template.format(
+            title=title, text=text.replace("\n", " ")[:3000], limit=available_limit
+        )
+    except Exception as e:
+        print(f"      ⚠️ Erro format prompt: {e}")
         return None
 
     try:
@@ -136,18 +167,29 @@ def generate_description(text, title):
         clean_resp = robust_json_clean(response)
         data = json.loads(clean_resp, strict=False)
 
+        # Se o LLM retornar uma lista, pega o primeiro item
+        if isinstance(data, list) and len(data) > 0:
+            data = data[0]
+
+        if not isinstance(data, dict):
+            return None
+
         desc = data.get("description", "").strip()
         tags = data.get("hashtags", "").strip()
         if not desc:
             return None
 
-        footer = f"\n\n{tags}\n\n🎥 Vídeo Original: {ORIGINAL_URL}"
-        if len(desc) + len(footer) > MAX_DESC_LENGTH:
-            allowed = MAX_DESC_LENGTH - len(footer) - 50
+        # Monta o final_text para validar comprimento real
+        footer = f"\n\n{tags}{url_footer}"
+        total_len = len(desc) + len(footer)
+
+        if total_len > MAX_DESC_LENGTH:
+            allowed = MAX_DESC_LENGTH - len(footer) - 10
             desc = desc[:allowed]
             if "." in desc:
                 desc = desc.rsplit(".", 1)[0] + "."
             data["description"] = desc
+
         return data
     except Exception as e:
         print(f"      ❌ Erro: {e}")
@@ -181,7 +223,7 @@ def process_file_dict(json_filename):
             "[link_do_vídeo_aqui]",
         ]
         is_generic = any(p in current_desc.lower() for p in generic_p)
-        is_too_short = len(current_desc) < 200
+        is_too_short = len(current_desc) < 250
         is_too_long = len(current_desc) > MAX_DESC_LENGTH
 
         if not text_source:
@@ -201,12 +243,14 @@ def process_file_dict(json_filename):
             if ai_data:
                 desc_f = ai_data.get("description", "")
                 tags_f = ai_data.get("hashtags", "")
-                final_text = (
-                    f"{desc_f}\n\n{tags_f}\n\n🎥 Vídeo Original: {ORIGINAL_URL}"
-                )
+                url_footer = f"\n\n🎥 Vídeo Original: {ORIGINAL_URL}"
+                final_text = f"{desc_f}\n\n{tags_f}{url_footer}"
 
                 if len(final_text) > MAX_DESC_LENGTH:
-                    final_text = final_text[: MAX_DESC_LENGTH - 3] + "..."
+                    # Se ainda passar, corta preservando o footer
+                    footer_len = len(tags_f) + len(url_footer) + 2
+                    allowed = MAX_DESC_LENGTH - footer_len - 5
+                    final_text = desc_f[:allowed] + "...\n\n" + tags_f + url_footer
 
                 item["youtube_description"] = final_text
                 updated_count += 1
@@ -254,11 +298,19 @@ def process_file_list(json_filename):
             print(f"   ✍️  {title[:40]}...")
             ai_data = generate_description(text_source, title)
             if ai_data:
-                item["description"] = ai_data.get("description", "")
-                item["hashtags"] = ai_data.get("hashtags", "")
-                f_text = f"{item['description']}\n\n{item['hashtags']}\n\n🎥 Vídeo Original: {ORIGINAL_URL}"
+                desc_f = ai_data.get("description", "")
+                tags_f = ai_data.get("hashtags", "")
+                url_footer = f"\n\n🎥 Vídeo Original: {ORIGINAL_URL}"
+
+                item["description"] = desc_f
+                item["hashtags"] = tags_f
+
+                f_text = f"{desc_f}\n\n{tags_f}{url_footer}"
                 if len(f_text) > MAX_DESC_LENGTH:
-                    f_text = f_text[: MAX_DESC_LENGTH - 3] + "..."
+                    footer_len = len(tags_f) + len(url_footer) + 2
+                    allowed = MAX_DESC_LENGTH - footer_len - 5
+                    f_text = desc_f[:allowed] + "...\n\n" + tags_f + url_footer
+
                 item["youtube_description"] = f_text
                 updated_count += 1
                 if updated_count % 3 == 0:

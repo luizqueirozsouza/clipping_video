@@ -28,13 +28,13 @@ OR_HEADERS = {
 
 
 def log(msg, level="info"):
-    icon = "ℹ️"
+    icon = "[INFO]"
     if level == "error":
-        icon = "❌"
+        icon = "[ERRO]"
     elif level == "success":
-        icon = "✅"
+        icon = "[OK]"
     elif level == "warning":
-        icon = "⚠️"
+        icon = "[AVISO]"
     print(f"[{time.strftime('%H:%M:%S')}] {icon} {msg}")
 
 
@@ -123,19 +123,19 @@ def call_llm(
                             raise ValueError("Vazio")
                         return content
                     except:
-                        log("⚠️ Erro parsing resposta OpenRouter", "error")
+                        log("Erro parsing resposta OpenRouter", "error")
                 elif resp.status_code == 429:
                     wt = 5 * (2**attempt)
-                    log(f"⏳ Rate Limit. Aguardando {wt}s...", "warning")
+                    log(f"Rate Limit. Aguardando {wt}s...", "warning")
                     time.sleep(wt)
                     if attempt >= 1 and GEMINI_KEY:  # Failover
-                        log("⚠️ OpenRouter lento. Tentando Direct...", "warning")
+                        log("OpenRouter lento. Tentando Direct...", "warning")
                         break
                 else:
                     if resp.status_code < 500:
                         break
             except Exception as e:
-                log(f"⚠️ Erro Conexão (T{attempt + 1}): {e}", "error")
+                log(f"Erro Conexão (T{attempt + 1}): {e}", "error")
                 time.sleep(2)
 
     # 2. GEMINI DIRECT
@@ -151,14 +151,14 @@ def call_llm(
             )
             return response.text
         except Exception as e:
-            log(f"⚠️ Erro Gemini Direct: {e}", "error")
+            log(f"Erro Gemini Direct: {e}", "error")
 
     # 3. OPENAI DIRECT (Fallback)
     if OPENAI_KEY:
         try:
             from openai import OpenAI
 
-            client = OpenAI(api_key=OPENAI_API_KEY)
+            client = OpenAI(api_key=OPENAI_KEY)
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -182,11 +182,9 @@ def correct_transcript_grammar(segments):
     if not segments:
         return segments
 
-    print(f"✍️  Iniciando correção gramatical ({len(segments)} segmentos)...")
+    print(f"Iniciando correcao gramatical ({len(segments)} segmentos)...")
 
-    BATCH_SIZE = (
-        20  # Processa 20 linhas por vez (equilíbrio entre velocidade e precisão)
-    )
+    BATCH_SIZE = 100  # Aumentado para 100 para acelerar o processo mantendo a precisão no Gemini 2.0 Flash
     total_batches = (len(segments) + BATCH_SIZE - 1) // BATCH_SIZE
 
     prompt_system = "Você é um editor de texto especialista. Corrija a ortografia e gramática das frases listadas abaixo. **RETORNE APENAS UMA LISTA JSON**. É CRUCIAL que você mantenha a MESMA quantidade de linhas e a MESMA ordem. Não mescle frases, mesmo que pareça incompleto."
@@ -225,24 +223,32 @@ def correct_transcript_grammar(segments):
                         original_text = seg["text"]
                         corrected_text = corrected_list[j]
 
+                        # Limpa possíveis prefixos de índice que a LLM possa ter repetido (evita [0], [1], etc na legenda)
+                        if isinstance(corrected_text, str):
+                            # re.sub mais agressivo para pegar mesmo se houver espaços antes
+                            corrected_text = re.sub(
+                                r"^\s*\[\d+\]\s*", "", corrected_text
+                            )
+                            corrected_text = re.sub(
+                                r"^\s*\[ID\s*\d+\]\s*", "", corrected_text
+                            )
+
                         # Opcional: Só atualiza se houver mudança significativa para manter o cache
                         if original_text != corrected_text:
                             seg["text"] = corrected_text
 
                     corrected_count += len(batch)
-                    print(f"   ✅ Lote {batch_index}/{total_batches} corrigido.")
+                    print(f"   Lote {batch_index}/{total_batches} corrigido.")
                 else:
                     print(
-                        f"   ⚠️  Lote {batch_index}/{total_batches} com erro de tamanho ({len(corrected_list)} vs {len(batch)}). Mantendo original."
+                        f"   Aviso: Lote {batch_index}/{total_batches} com erro de tamanho ({len(corrected_list)} vs {len(batch)}). Mantendo original."
                     )
 
-        except Exception as e:
-            print(
-                f"   ❌ Erro no lote {batch_index}: {e}. Mantendo original deste lote."
-            )
+        except Exception:
+            print(f"   Erro no lote {batch_index}. Mantendo original deste lote.")
             continue
 
     print(
-        f"✅ Processo finalizado. {corrected_count}/{len(segments)} segmentos processados."
+        f"Processo finalizado. {corrected_count}/{len(segments)} segmentos processados."
     )
     return segments

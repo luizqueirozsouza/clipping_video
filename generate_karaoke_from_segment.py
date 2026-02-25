@@ -1,10 +1,14 @@
 import json
 import os
+import re
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv(override=False)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 # ======================
 # CONFIG
@@ -118,14 +122,14 @@ def main():
                 platforms.append(p)
 
     if not platforms:
-        print("❌ Nenhum arquivo de cortes encontrado.")
+        print("Erro: Nenhum arquivo de cortes encontrado.")
         return
 
     # ----------------------
     # Loop por plataforma
     # ----------------------
     for platform in platforms:
-        print(f"\n📝 Gerando legendas: {platform.upper()}")
+        print(f"\nGerando legendas: {platform.upper()}")
 
         cuts_path = (
             CUTS_JSON
@@ -139,7 +143,7 @@ def main():
         )
 
         if not cuts_path.exists():
-            print(f"⚠️ Cortes não encontrados: {cuts_path}")
+            print(f"Aviso: Cortes nao encontrados: {cuts_path}")
             continue
 
         cuts = json.load(open(cuts_path, encoding="utf-8"))
@@ -159,11 +163,11 @@ def main():
                 pass
 
         if not words:
-            print("⚠️ Usando estimativa matemática.")
+            print("Aviso: Usando estimativa matematica.")
             words = estimate_words_from_segments()
 
         if not words:
-            print("❌ Nenhuma palavra disponível.")
+            print("Erro: Nenhuma palavra disponivel.")
             continue
 
         # ----------------------
@@ -205,9 +209,12 @@ Format: Layer, Start, End, Style, Text
             clip_words = []
             for w in words:
                 if w["start"] >= sc - 0.5 and w["end"] <= ec + 0.5:
+                    clean_word = re.sub(r"\[\d+\]", "", w["word"]).strip()
+                    if not clean_word:
+                        continue
                     clip_words.append(
                         {
-                            "word": w["word"].upper() if SUB_UPPERCASE else w["word"],
+                            "word": clean_word.upper() if SUB_UPPERCASE else clean_word,
                             "start": max(0, w["start"] - sc),
                             "end": w["end"] - sc,
                         }
@@ -234,7 +241,7 @@ Format: Layer, Start, End, Style, Text
             if ass_file.exists():
                 ok += 1
 
-        print(f"✅ [{platform}] Legendas criadas: {ok}/{len(cuts)}")
+        print(f"OK [{platform}] Legendas criadas: {ok}/{len(cuts)}")
 
 
 if __name__ == "__main__":

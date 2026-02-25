@@ -27,4 +27,5 @@ dependencies = [
     "tqdm>=4.67.1",
     "yt-dlp>=2025.12.8",
     "onnxruntime>=1.16.0,<1.18.0",
+    "maturin>=1.12.4",
 ]
